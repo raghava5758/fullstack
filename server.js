@@ -1,68 +1,42 @@
-const express = require('express');
+import express from 'express';
 const app = express();
-const port = 3000;
+const PORT = process.env.PORT || 3000;
 
-// Middleware to parse JSON bodies
-app.use(express.json());
+// Logging middleware: method, url, timestamp
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url}`);
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  next();
-});
-function authMiddleware(req, res, next) {
-	  const token = req.headers['authorization'];
-	  if (token === 'Bearer mysecrettoken') {
-	    next();
-	  } else {
-	    res.status(403).json({ message: 'Forbidden' });
-	  }
-	}
-
-
-let users = [];
-
-// Create a user (POST /users)
-app.post('/users', (req, res) => {
-  const user = req.body;
-  users.push(user);
-  res.status(201).json({ message: 'User added', user });
-});
-
-// Get all users (GET /users)
-app.get('/users', (req, res) => {
-  res.status(200).json(users);
-});
-
-// Update a user (PUT /users/:id)
-app.put('/users/:id', (req, res) => {
-  const id = req.params.id;
-  const updatedUser = req.body;
-  users = users.map(user => (user.id === id ? updatedUser : user));
-  res.status(200).json({ message: 'User updated', updatedUser });
-});
-
-// Delete a user (DELETE /users/:id)
-app.delete('/users/:id', (req, res) => {
-  const id = req.params.id;
-  users = users.filter(user => user.id !== id);
-  res.status(200).json({ message: 'User deleted' });
-});
-const router = express.Router();
-
-router.use((req, res, next) => {
-  console.log('Admin router middleware executed');
-  //res.send('Admin dashboard')
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${req.method} ${req.originalUrl}`);
   next();
 });
 
-router.get('/dashboard', (req, res) => {
-  res.send('Admin dashboard');
+// Bearer token auth middleware
+function requireBearerToken(req, res, next) {
+  const auth = req.headers.authorization || '';
+  const [scheme, token] = auth.split(' ');
+  if (scheme !== 'Bearer' || !token) {
+    return res.status(401).json({ message: 'Authorization header missing or incorrect' });
+  }
+  if (token !== 'mysecrettoken') {
+    return res.status(403).json({ message: 'Invalid token' });
+  }
+  next();
+}
+
+// Public route
+app.get('/public', (req, res) => {
+  res.status(200).send('This is a public route. No authentication required.');
 });
 
-app.use('/admin',authMiddleware, router);
+// Root route - guide users
+app.get('/', (req, res) => {
+  res.status(200).send('Server is running. Try GET /public or GET /protected with Authorization: Bearer mysecrettoken');
+});
 
+// Protected route
+app.get('/protected', requireBearerToken, (req, res) => {
+  res.status(200).send('You have accessed a protected route with a valid Bearer token!');
+});
 
-// Start the server
-app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
+app.listen(PORT, () => {
+  console.log(`Server listening on http://localhost:${PORT}`);
 });
